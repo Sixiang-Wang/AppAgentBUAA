@@ -61,6 +61,8 @@ import java.util.Objects;
 public class MainActivity extends AppCompatActivity {
     private ActivityMainBinding binding;
     public static String TAG = "MainActivity";
+    private static final String ACCESSIBILITY_SERVICE_ID = "com.example.myapplication/.MyAccessibilityService";
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -100,6 +102,9 @@ public class MainActivity extends AppCompatActivity {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
+        });
+        binding.btnStartAccessibility.setOnClickListener(v -> {
+            checkAccessibilityService();
         });
     }
 
@@ -189,6 +194,27 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void checkAccessibilityService(){
+        // 检查无障碍服务是否已启用
+        if (!isAccessibilityServiceEnabled(this, ACCESSIBILITY_SERVICE_ID)) {
+            // 如果未授权，则跳转到无障碍设置页面
+            Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+            startActivity(intent);
+        }
+    }
+
+    private boolean isAccessibilityServiceEnabled(Context context, String serviceId) {
+        try {
+            String enabledServices = Settings.Secure.getString(
+                    context.getContentResolver(),
+                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            );
+            return enabledServices != null && enabledServices.contains(serviceId);
+        } catch (Exception e) {
+            Log.e("AccessibilityCheck", "检查无障碍权限时出错", e);
+            return false;
+        }
+    }
 
 
 }
