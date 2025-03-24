@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">My Application</string>
+    <string name="accessibility_service_desc">用于自动学习点击的服务</string>
+</resources>
