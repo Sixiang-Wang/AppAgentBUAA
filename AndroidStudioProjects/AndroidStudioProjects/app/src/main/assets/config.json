@@ -1,0 +1,17 @@
+{
+  "MODEL": "Qwen",
+  "OPENAI_API_BASE": "https://api.openai.com/v1/chat/completions",
+  "OPENAI_API_KEY": "sk-",
+  "OPENAI_API_MODEL": "gpt-4-vision-preview",
+  "MAX_TOKENS": 300,
+  "TEMPERATURE": 0.0,
+  "REQUEST_INTERVAL": 10,
+  "DASHSCOPE_API_KEY": "sk-04e0cacf952646b7b0481746d122e0ea",
+  "QWEN_MODEL": "qwen-vl-max",
+  "ANDROID_SCREENSHOT_DIR": "/storage/emulated/0",
+  "ANDROID_XML_DIR": "/storage/emulated/0",
+  "DOC_REFINE": false,
+  "MAX_ROUNDS": 2,
+  "DARK_MODE": false,
+  "MIN_DIST": 30
+}

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">https://dashscope.aliyuncs.com/api/v1/apps/2242a204827a4e9c9c6804e2059a4c85/completion</domain>
+    </domain-config>
+</network-security-config>
