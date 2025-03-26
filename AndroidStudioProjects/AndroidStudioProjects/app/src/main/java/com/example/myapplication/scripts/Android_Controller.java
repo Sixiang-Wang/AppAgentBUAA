@@ -4,7 +4,13 @@ import static com.example.myapplication.scripts.config.loadConfig;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.BitmapFactory;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Point;
+import android.graphics.Rect;
 import android.view.WindowMetrics;
 
 import com.example.myapplication.MyAccessibilityService;
@@ -19,10 +25,13 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -30,8 +39,8 @@ import javax.xml.parsers.DocumentBuilderFactory;
 
 public class Android_Controller{
     Context context;
-    int width;
-    int height;
+    public static int width;
+    public static int height;
     String screenshot_dir;
     String xml_dir;
     String backslash;
@@ -39,8 +48,8 @@ public class Android_Controller{
     double MIN_DIST;
     public Android_Controller(Context context){
         this.context=context;
-        this.width=this.get_device_size().x;
-        this.height=this.get_device_size().y;
+        width=this.get_device_size().x;
+        height=this.get_device_size().y;
         Map<String,String> configs = loadConfig(this.context);
         this.screenshot_dir = configs.get("ANDROID_SCREENSHOT_DIR");
         this.xml_dir = configs.get("ANDROID_XML_DIR");
@@ -66,23 +75,43 @@ public class Android_Controller{
         return save_dir+"/"+prefix;
     }
 
-    public String get_xml(int round_count, File task_dir){
+    public interface Callback<T> {
+        void onComplete(T result);
+    }
+
+    public void get_xml(int round_count, File task_dir, Callback<String> callback){
         if(MyAccessibilityService.getInstance()!=null){
             ToastUtils.longCall("保存开始");
             String round_count_string = String.valueOf(round_count);
-            new Thread(() -> {
+
+            CountDownLatch latch = new CountDownLatch(1);  // 计数器，初始值为1
+            String[] resultPath = new String[1]; // 存储 XML 文件路径
+            TaskPool.CACHE.execute(() -> {
                 try {
-                    Thread.sleep(5000); // 先等待 5 秒,防止你来不及换到其他应用
+                    Thread.sleep(2000L);
+                    TaskPool.MAIN.post(() ->
+                            {
+                                MyAccessibilityService.getInstance().saveUiHierarchy(round_count_string, task_dir.getAbsolutePath());
+                                resultPath[0] = task_dir.getAbsolutePath() + "/" + round_count_string + ".xml";
+                                latch.countDown();  // 任务完成，释放锁
+                            }
+                    );
+                    Thread.sleep(200L);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-                MyAccessibilityService.getInstance().saveUiHierarchy(round_count_string, task_dir.getAbsolutePath());
-                ToastUtils.longCall("保存完成！");
+            });
+            new Thread(() -> {
+                try {
+                    latch.await();  // 在子线程等待
+                    TaskPool.MAIN.post(() -> callback.onComplete(resultPath[0]));  // 回到主线程
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }).start();
-            return task_dir.getAbsolutePath()+"/"+round_count_string+".xml";
+
         }else{
             ToastUtils.longCall("无障碍未启动！");
-            return null;
         }
     }
 
@@ -143,8 +172,7 @@ public class Android_Controller{
                     Node node = attrMap.item(i);
                     attributes.put(node.getNodeName(), node.getNodeValue());
                 }
-
-                elemList.add(new Android_Element(elemId, bbox, attributes));
+                elemList.add(new Android_Element(elemId, bbox, attrib));
             }
         }
 
@@ -155,20 +183,119 @@ public class Android_Controller{
                 parseElement((Element) node, path, elemList, attrib, addIndex);
             }
         }
-
         path.remove(path.size() - 1);
     }
 
     private int[] parseBounds(String bounds) {
-        String[] parts = bounds.replace("[", "").replace("]", "").split("\\]\\[");
+        utils.printWithColor(bounds,"yellow");
+        String[] parts = bounds.split("]\\["); // 直接拆分
+        parts[0] = parts[0].replace("[", ""); // 去掉第一个 "["
+        parts[1] = parts[1].replace("]", ""); // 去掉第二个 "]"
         String[] p1 = parts[0].split(",");
         String[] p2 = parts[1].split(",");
+
         return new int[]{Integer.parseInt(p1[0]), Integer.parseInt(p1[1]), Integer.parseInt(p2[0]), Integer.parseInt(p2[1])};
     }
 
-    private static String getIdFromElement(Element elem) {
-        return elem.getAttribute("class").replace(".", "_").toLowerCase();
+    private String getIdFromElement(Element elem) {
+        String boundsStr = elem.getAttribute("bounds");
+        int[] bbox = parseBounds(boundsStr);
+        int elemW = bbox[2] - bbox[0];
+        int elemH = bbox[3] - bbox[1];
+        String elemId;
+        if (elem.hasAttribute("resource-id") && !elem.getAttribute("resource-id").isEmpty()) {
+            elemId = elem.getAttribute("resource-id").replace(":", ".").replace("/", "_");
+        } else {
+            elemId = elem.getAttribute("class") + "_" + elemW + "_" + elemH;
+        }
+
+        if (elem.hasAttribute("content-desc") && !elem.getAttribute("content-desc").isEmpty() &&
+                elem.getAttribute("content-desc").length() < 20) {
+            String contentDesc = elem.getAttribute("content-desc")
+                    .replace("/", "_")
+                    .replace(" ", "")
+                    .replace(":", "_");
+            elemId += "_" + contentDesc;
+        }
+        return elemId;
     }
+    public void drawBoundingBoxes(String img_path,
+                                           String output_path,
+                                           List<Android_Element> elemList,
+                                           boolean recordMode,
+                                           boolean darkMode) {
+        Bitmap originalBitmap = BitmapFactory.decodeFile(img_path);
+        Bitmap mutableBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true);
+        Canvas canvas = new Canvas(mutableBitmap);
+        Paint textPaint = new Paint();
+        textPaint.setTextSize(40);
+        textPaint.setAntiAlias(true);
+        Paint backgroundPaint = new Paint();
+        backgroundPaint.setStyle(Paint.Style.FILL);
+        int count = 1;
+
+        for (Android_Element elem : elemList) {
+            try {
+                int left = elem.bbox[0];
+                int top = elem.bbox[1];
+                int right = elem.bbox[2];
+                int bottom = elem.bbox[3];
+                // 选择边界框颜色
+                if (recordMode) {
+                    if ("clickable".equals(elem.attrib)) {
+                        backgroundPaint.setColor(Color.RED);
+                    } else if ("focusable".equals(elem.attrib)) {
+                        backgroundPaint.setColor(Color.BLUE);
+                    } else {
+                        backgroundPaint.setColor(Color.GREEN);
+                    }
+                } else {
+                    backgroundPaint.setColor(Color.BLACK);
+                }
+
+                // 选择文本颜色
+                textPaint.setColor(darkMode ? Color.BLACK : Color.WHITE);
+
+                // 计算文本背景的矩形区域
+                String label = String.valueOf(count);
+                Rect textBounds = new Rect();
+                textPaint.getTextBounds(label, 0, label.length(), textBounds);
+
+                int textX = (left + right) / 2 + 10;
+                int textY = (top + bottom) / 2 + 10;
+                int padding = 10;
+
+                // 绘制文本背景
+                canvas.drawRect(textX - padding,
+                        textY - textBounds.height() - padding,
+                        textX + textBounds.width() + padding,
+                        textY + padding, backgroundPaint);
+
+                // 绘制文本
+                canvas.drawText(label, textX, textY, textPaint);
+
+
+
+            } catch (Exception e) {
+                System.out.println("ERROR: Exception occurred while labeling the image\n" + e.getMessage());
+            }
+            count++;
+        }
+
+        try {
+            File file = new File(output_path);
+            FileOutputStream out = new FileOutputStream(file);
+            mutableBitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+            out.flush();
+            out.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+
+
 
 
 

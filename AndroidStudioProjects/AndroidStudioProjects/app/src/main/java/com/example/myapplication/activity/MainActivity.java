@@ -42,6 +42,7 @@ import com.example.myapplication.constant.RequestCode;
 import com.example.myapplication.constant.ServiceType;
 import com.example.myapplication.databinding.ActivityMainBinding;
 import com.example.myapplication.scripts.Android_Controller;
+import com.example.myapplication.scripts.Android_Element;
 import com.example.myapplication.scripts.QwenModel;
 import com.example.myapplication.scripts.utils;
 import com.example.myapplication.services.MediaProjectionService;
@@ -54,7 +55,10 @@ import com.example.myapplication.view.ScreenshotView;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -177,20 +181,64 @@ public class MainActivity extends AppCompatActivity {
         int doc_count = 0;
         String last_act = "None";
         Boolean task_complete = false;
+        List<String> useless_list = new ArrayList<>();
 
         //回到桌面
         Intent intent = new Intent(Intent.ACTION_MAIN);
         intent.addCategory(Intent.CATEGORY_HOME);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
-
+        Thread.sleep(2000);
         while (round_count < Integer.parseInt(Objects.requireNonNull(configs.get("MAX_ROUNDS")))) {
            round_count++;
            utils.printWithColor("Round "+round_count,"yellow");
            String screenshot_before = androidController.get_screenshot(round_count+"_before.png",task_dir.getAbsolutePath());
-           String xml_path = androidController.get_xml(round_count,task_dir);
            utils.printWithColor(screenshot_before,"yellow");
-           utils.printWithColor(xml_path,"yellow");
+           String output_path = task_dir.getAbsolutePath()+"/"+String.valueOf(round_count)+"_before_labeled.png";
+           Boolean dark_mode = Boolean.valueOf(configs.get("DARK_MODE"));
+           androidController.get_xml(round_count,task_dir, result -> {
+               // 这里是 XML 文件保存完成后的回调
+               utils.printWithColor("XML 文件路径：" + result, "yellow");
+               File xml = new File(result);
+               List<Android_Element> clickable_list = new ArrayList<>();
+               List<Android_Element> focusable_list = new ArrayList<>();
+               androidController.traverseTree(result,clickable_list,"clickable",true);
+               androidController.traverseTree(result,focusable_list,"focusable",true);
+               List<Android_Element> elem_list = new ArrayList<>();
+               for(Android_Element elem:clickable_list){
+                   if(useless_list.contains(elem.uid)){
+                       continue;
+                   }
+                   elem_list.add(elem);
+               }
+               for(Android_Element elem:focusable_list){
+                   if(useless_list.contains(elem.uid)){
+                       continue;
+                   }
+                   int[] bbox = elem.bbox;
+                   int[] center ={(bbox[0] + bbox[1]) / 2, (bbox[2] + bbox[3]) / 2};
+                   boolean close=false;
+                   for(Android_Element e:clickable_list){
+                       bbox = e.bbox;
+                       int[] center_ ={(bbox[0] + bbox[1]) / 2, (bbox[2] + bbox[3]) / 2};
+                       double dist = Math.sqrt(Math.pow(Math.abs(center[0] - center_[0]), 2) +
+                               Math.pow(Math.abs(center[1] - center_[1]), 2));
+                       if(dist<=Double.parseDouble(configs.get("MIN_DIST"))){
+                            close=true;
+                            break;
+                       }
+                   }
+                   if(!close){
+                       elem_list.add(elem);
+                   }
+               }
+                for(Android_Element sad:elem_list){
+                    utils.printWithColor(sad.attrib,"yellow");
+                }
+                androidController.drawBoundingBoxes(screenshot_before,output_path,elem_list,false,dark_mode);
+
+           });
+
         }
     }
 
