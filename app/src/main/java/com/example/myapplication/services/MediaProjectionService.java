@@ -129,19 +129,6 @@ public class MediaProjectionService extends Service {
         }
     }
 
-    private static String createScreenshotFileName() {
-        return "Screenshot-"+getDateStr()+".png";
-    }
-    private static String getDateStr() {
-        Calendar calendar = Calendar.getInstance(Locale.CHINA);
-        int year = calendar.get(Calendar.YEAR);
-        int month = calendar.get(Calendar.MONTH) + 1;
-        int day = calendar.get(Calendar.DAY_OF_MONTH);
-        int hour = calendar.get(Calendar.HOUR_OF_DAY);
-        int minute = calendar.get(Calendar.MINUTE);
-        int second = calendar.get(Calendar.SECOND);
-        return String.format("%d%02d%02d%02d%02d%02d", year, month, day, hour, minute, second);
-    }
 
     @Override
     public void onDestroy() {
