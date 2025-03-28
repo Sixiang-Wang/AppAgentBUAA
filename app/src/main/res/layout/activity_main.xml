@@ -91,6 +91,11 @@
             android:text="启动" />
     </RelativeLayout>
 
+
+
+
+
+
     <RelativeLayout
         style="@style/Item">
         <TextView
@@ -104,7 +109,7 @@
             android:id="@+id/btn_startAccessibility"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="114dp"
+            android:layout_marginStart="121dp"
             android:layout_toEndOf="@id/tv_accessibility_service"
             android:text="启动" />
     </RelativeLayout>
