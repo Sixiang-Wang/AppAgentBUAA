@@ -2,6 +2,9 @@ package com.example.myapplication.scripts;
 
 import static com.example.myapplication.scripts.config.loadConfig;
 
+import android.view.accessibility.AccessibilityWindowInfo;
+import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.GestureDescription;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.BitmapFactory;
@@ -9,15 +12,22 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.os.Build;
+import android.os.Bundle;
+import android.util.Log;
 import android.view.WindowMetrics;
 
-import com.example.myapplication.MyAccessibilityService;
+import androidx.annotation.RequiresApi;
+import com.example.myapplication.myAccessibilityService;
 import com.example.myapplication.services.MediaProjectionService;
 import com.example.myapplication.util.TaskPool;
 import com.example.myapplication.util.ToastUtils;
+import static com.example.myapplication.activity.MainActivity.TAG;
 
+import org.json.JSONException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
@@ -35,9 +45,11 @@ import java.util.concurrent.CountDownLatch;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import android.app.UiAutomation;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityWindowInfo;
 
-
-public class Android_Controller{
+public class androidController {
     Context context;
     public static int width;
     public static int height;
@@ -46,11 +58,11 @@ public class Android_Controller{
     String backslash;
 
     double MIN_DIST;
-    public Android_Controller(Context context){
+    public androidController(Context context){
         this.context=context;
         width=this.get_device_size().x;
         height=this.get_device_size().y;
-        Map<String,String> configs = loadConfig(this.context);
+        Map<String,String> configs = loadConfig(this.context,"config.json");
         this.screenshot_dir = configs.get("ANDROID_SCREENSHOT_DIR");
         this.xml_dir = configs.get("ANDROID_XML_DIR");
         this.backslash="\\";
@@ -76,11 +88,11 @@ public class Android_Controller{
     }
 
     public interface Callback<T> {
-        void onComplete(T result);
+        void onComplete(T result) throws IOException, JSONException;
     }
 
     public void get_xml(int round_count, File task_dir, Callback<String> callback){
-        if(MyAccessibilityService.getInstance()!=null){
+        if(myAccessibilityService.getInstance()!=null){
             ToastUtils.longCall("保存开始");
             String round_count_string = String.valueOf(round_count);
 
@@ -91,7 +103,7 @@ public class Android_Controller{
                     Thread.sleep(2000L);
                     TaskPool.MAIN.post(() ->
                             {
-                                MyAccessibilityService.getInstance().saveUiHierarchy(round_count_string, task_dir.getAbsolutePath());
+                                myAccessibilityService.getInstance().saveUiHierarchy(round_count_string, task_dir.getAbsolutePath());
                                 resultPath[0] = task_dir.getAbsolutePath() + "/" + round_count_string + ".xml";
                                 latch.countDown();  // 任务完成，释放锁
                             }
@@ -104,18 +116,25 @@ public class Android_Controller{
             new Thread(() -> {
                 try {
                     latch.await();  // 在子线程等待
-                    TaskPool.MAIN.post(() -> callback.onComplete(resultPath[0]));  // 回到主线程
+                    TaskPool.MAIN.post(() -> {
+                        try {
+                            callback.onComplete(resultPath[0]);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        } catch (JSONException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });  // 回到主线程
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }).start();
-
         }else{
             ToastUtils.longCall("无障碍未启动！");
         }
     }
 
-    public void traverseTree(String xmlPath, List<Android_Element> elemList, String attrib, boolean addIndex) {
+    public void traverseTree(String xmlPath, List<androidElement> elemList, String attrib, boolean addIndex) {
         try {
             File inputFile = new File(xmlPath);
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -130,7 +149,7 @@ public class Android_Controller{
             e.printStackTrace();
         }
     }
-    private void parseElement(Element elem, List<Element> path, List<Android_Element> elemList, String attrib, boolean addIndex) {
+    private void parseElement(Element elem, List<Element> path, List<androidElement> elemList, String attrib, boolean addIndex) {
         path.add(elem);
 
         if (elem.hasAttribute(attrib) && elem.getAttribute(attrib).equals("true")) {
@@ -153,7 +172,7 @@ public class Android_Controller{
             }
 
             boolean close = false;
-            for (Android_Element e : elemList) {
+            for (androidElement e : elemList) {
                 int[] bbox2 = e.bbox;
                 int centerX2 = (bbox2[0] + bbox2[2]) / 2;
                 int centerY2 = (bbox2[1] + bbox2[3]) / 2;
@@ -172,7 +191,7 @@ public class Android_Controller{
                     Node node = attrMap.item(i);
                     attributes.put(node.getNodeName(), node.getNodeValue());
                 }
-                elemList.add(new Android_Element(elemId, bbox, attrib));
+                elemList.add(new androidElement(elemId, bbox, attrib));
             }
         }
 
@@ -187,7 +206,7 @@ public class Android_Controller{
     }
 
     private int[] parseBounds(String bounds) {
-        utils.printWithColor(bounds,"yellow");
+        printUtils.printWithColor(bounds,"yellow");
         String[] parts = bounds.split("]\\["); // 直接拆分
         parts[0] = parts[0].replace("[", ""); // 去掉第一个 "["
         parts[1] = parts[1].replace("]", ""); // 去掉第二个 "]"
@@ -221,7 +240,7 @@ public class Android_Controller{
     }
     public void drawBoundingBoxes(String img_path,
                                            String output_path,
-                                           List<Android_Element> elemList,
+                                           List<androidElement> elemList,
                                            boolean recordMode,
                                            boolean darkMode) {
         Bitmap originalBitmap = BitmapFactory.decodeFile(img_path);
@@ -234,7 +253,7 @@ public class Android_Controller{
         backgroundPaint.setStyle(Paint.Style.FILL);
         int count = 1;
 
-        for (Android_Element elem : elemList) {
+        for (androidElement elem : elemList) {
             try {
                 int left = elem.bbox[0];
                 int top = elem.bbox[1];
@@ -293,6 +312,99 @@ public class Android_Controller{
         }
 
     }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    public void tap(int x, int y) {
+        if (myAccessibilityService.getInstance() == null) {
+            Log.e(TAG, "无障碍服务实例为空，无法执行点击！");
+            return;
+        }
+
+        Log.d(TAG, "开始执行点击: (" + x + ", " + y + ")");
+
+        Path path = new Path();
+        path.moveTo(x, y);
+        path.lineTo(x,y);
+        GestureDescription.StrokeDescription stroke = new GestureDescription.StrokeDescription(path, 100, 300);
+        GestureDescription.Builder builder = new GestureDescription.Builder();
+        builder.addStroke(stroke);
+        boolean success = myAccessibilityService.getInstance().dispatchGesture(
+                builder.build(),
+                new AccessibilityService.GestureResultCallback() {
+                    @Override
+                    public void onCompleted(GestureDescription gestureDescription) {
+                        Log.d(TAG, "点击成功");
+                    }
+                    @Override
+                    public void onCancelled(GestureDescription gestureDescription) {
+                        Log.e(TAG, "点击被取消！");
+                    }
+                },
+                null
+        );
+
+        Log.d(TAG, "dispatchGesture 返回值: " + success);
+    }
+
+
+    public void text(String inputText) {
+        if (myAccessibilityService.getInstance() == null) {
+            Log.e(TAG, "无障碍服务实例为空，无法执行输入！");
+            return;
+        }
+        List<AccessibilityWindowInfo> windows = myAccessibilityService.getInstance().getWindows();
+        for (AccessibilityWindowInfo window : windows) {
+            // 只操作前台应用的窗口
+            if (window.getType() == AccessibilityWindowInfo.TYPE_APPLICATION) {
+                AccessibilityNodeInfo rootNode = window.getRoot();
+                if (rootNode != null) {
+                    Log.d(TAG, "Found application window, searching for input field...");
+                    if (findAndInputText(rootNode, inputText)) {
+                        Log.d(TAG, "Text input successful: " + inputText);
+                    } else {
+                        Log.d(TAG, "No input field found.");
+                    }
+                    return; // 只处理第一个找到的应用窗口
+                }
+            }
+        }
+        Log.d(TAG, "No application window found.");
+    }
+
+    /**
+     * 遍历 UI 树，查找 EditText 并输入文本
+     */
+    private boolean findAndInputText(AccessibilityNodeInfo node, String text) {
+        if (node == null) return false;
+
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child == null) continue;
+
+            // 检查是否是输入框
+            if (child.getClassName() != null && child.getClassName().toString().contains("EditText")) {
+                child.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+                Bundle args = new Bundle();
+                args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text);
+                boolean result = child.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args);
+                return result; // 找到输入框并成功输入后返回 true
+            }
+            if (findAndInputText(child, text)) {
+                return true; // 递归查找成功
+            }
+        }
+        return false;
+    }
+
+
+
+
+
+
+
+
+
+
 
 
 

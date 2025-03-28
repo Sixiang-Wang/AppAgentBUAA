@@ -3,7 +3,9 @@
     android:accessibilityEventTypes="typeAllMask"
     android:accessibilityFeedbackType="feedbackAllMask"
     android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews"
-    android:canRequestFilterKeyEvents="true"
     android:canRetrieveWindowContent="true"
+    android:canRequestTouchExplorationMode="true"
     android:canRequestEnhancedWebAccessibility="true"
+    android:canRequestFilterKeyEvents="true"
+    android:canPerformGestures="true"
     android:notificationTimeout="100" />

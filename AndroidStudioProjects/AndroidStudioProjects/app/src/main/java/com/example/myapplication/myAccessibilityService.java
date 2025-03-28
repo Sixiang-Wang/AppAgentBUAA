@@ -1,8 +1,8 @@
 package com.example.myapplication;
 
 import static com.example.myapplication.activity.MainActivity.TAG;
-import static com.example.myapplication.scripts.Android_Controller.height;
-import static com.example.myapplication.scripts.Android_Controller.width;
+import static com.example.myapplication.scripts.androidController.height;
+import static com.example.myapplication.scripts.androidController.width;
 
 import android.accessibilityservice.AccessibilityService;
 import android.content.Intent;
@@ -19,8 +19,6 @@ import android.view.accessibility.AccessibilityWindowInfo;
 
 import androidx.annotation.RequiresApi;
 
-import com.example.myapplication.scripts.Android_Controller;
-
 import org.xmlpull.v1.XmlSerializer;
 
 import java.io.File;
@@ -28,16 +26,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
 
-public class MyAccessibilityService extends AccessibilityService {
-
-
-
+public class myAccessibilityService extends AccessibilityService {
     private static final String[] NAF_EXCLUDED_CLASSES = new String[] {
             android.widget.GridView.class.getName(), android.widget.GridLayout.class.getName(),
             android.widget.ListView.class.getName(), android.widget.TableLayout.class.getName()
     };
 
-    private static MyAccessibilityService instance; // 让外部可以访问
+    private static myAccessibilityService instance; // 让外部可以访问
 
     @Override
     public void onCreate() {
@@ -62,7 +57,7 @@ public class MyAccessibilityService extends AccessibilityService {
         // 需要实现的方法，无需操作
     }
 
-    public static MyAccessibilityService getInstance() {
+    public static myAccessibilityService getInstance() {
         return instance;
     }
 
@@ -282,6 +277,8 @@ public class MyAccessibilityService extends AccessibilityService {
             return accessibilityNodeInfo.getWindow();
         }
     }
+
+
 
 
 

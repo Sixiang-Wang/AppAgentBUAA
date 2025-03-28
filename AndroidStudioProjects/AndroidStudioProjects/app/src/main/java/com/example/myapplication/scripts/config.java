@@ -19,11 +19,11 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 public class config {
-    public static Map<String, String> loadConfig(Context context) {
-        copyConfigToInternalStorage(context);
+    public static Map<String, String> loadConfig(Context context,String file) {
+        copyConfigToInternalStorage(context,file);
         Map<String, String> configs = new HashMap<>(System.getenv());
         // 读取 JSON 配置文件
-        File configFile = new File(context.getFilesDir(), "config.json");
+        File configFile = new File(context.getFilesDir(), file);
         if (configFile.exists()) {
             try (BufferedReader reader = new BufferedReader(new FileReader(configFile))) {
                 // 读取 JSON 文件内容并转换为字符串
@@ -48,15 +48,15 @@ public class config {
         }
         return configs;
     }
-    public static void copyConfigToInternalStorage(Context context) {
-        File internalFile = new File(context.getFilesDir(), "config.json");
+    public static void copyConfigToInternalStorage(Context context,String file) {
+        File internalFile = new File(context.getFilesDir(), file);
         // 检查文件是否已存在，避免重复复制
         if (internalFile.exists()) {
-            Log.d(TAG, "config.json already exists in internal storage.");
+            Log.d(TAG, file+" already exists in internal storage.");
             return;
         }
 
-        try (InputStream inputStream = context.getAssets().open("config.json");
+        try (InputStream inputStream = context.getAssets().open(file);
              OutputStream outputStream = new FileOutputStream(internalFile)) {
 
             byte[] buffer = new byte[1024];
@@ -65,9 +65,12 @@ public class config {
                 outputStream.write(buffer, 0, length);
             }
 
-            Log.d(TAG, "config.json copied successfully to internal storage.");
+            Log.d(TAG, file+" copied successfully to internal storage.");
         } catch (IOException e) {
-            Log.e(TAG, "Failed to copy config.json", e);
+            Log.e(TAG, "Failed to copy "+file, e);
         }
     }
+
+
+
 }
