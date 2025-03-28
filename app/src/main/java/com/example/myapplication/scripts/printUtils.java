@@ -6,7 +6,7 @@ import static com.example.myapplication.activity.MainActivity.TAG;
 import android.util.Log;
 
 public class printUtils {
-    public static void printWithColor(String text, String color) {
+    public static void printWithColor(String text, String color){
         switch (color.toLowerCase()) {
             case "red":
                 Log.e(TAG, text);
@@ -21,4 +21,5 @@ public class printUtils {
                 Log.d(TAG, text);
         }
     }
+
 }
