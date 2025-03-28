@@ -12,6 +12,7 @@ import com.example.myapplication.scripts.qwenModel;
 import com.google.gson.Gson;
 
 import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 
 public class DocGen {
     Context context;
+
     public DocGen(Context context){
         this.context=context;
     }
@@ -193,23 +195,68 @@ public class DocGen {
                 docContent.put("long_press", "");
             }
 
-            printUtils.printWithColor("Waiting for GPT-4V to generate documentation for the element"+ resourceId, "yellow");
+            printUtils.printWithColor("Waiting for GPT-4V to generate documentation for the element " + resourceId, "yellow");
+            Map.Entry<Boolean, String> statusRsp = model.getModelResponse(prompt, Arrays.asList(imgBefore, imgAfter));
 
+
+
+            if (statusRsp.getKey()) {
+                // 更新文档内容
+                docContent.put(actionType, statusRsp.getValue());
+
+                // 写入日志文件
+                try (FileWriter logFile = new FileWriter(logPath, true)) {
+                    Map<String, Object> logItem = new HashMap<>();
+                    logItem.put("step", i);
+                    logItem.put("prompt", prompt);
+                    logItem.put("image_before", demoName + "_" + i + ".png");
+                    logItem.put("image_after", demoName + "_" + (i + 1) + ".png");
+                    logItem.put("response", statusRsp.getValue());
+
+                    logFile.write(new JSONObject(logItem).toString() + "\n");
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                // 写入或更新文档文件
+                try {
+                    if (docPath.exists()) {
+                        // 如果文件已经存在，则读取内容并更新
+                        String docContentStr = new String(Files.readAllBytes(docPath.toPath()));
+                        JSONObject docJson = new JSONObject(docContentStr);
+
+                        // 更新文档内容
+                        docJson.put(actionType, statusRsp.getValue());
+
+                        try (FileWriter docFileTemp = new FileWriter(docPath)) {
+                            docFileTemp.write(docJson.toString());
+                        }
+                    } else {
+                        // 如果文件不存在，则创建新文档
+                        JSONObject docJson = new JSONObject(docContent);
+                        try (FileWriter docFileTemp = new FileWriter(docPath)) {
+                            docFileTemp.write(docJson.toString());
+                        }
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                docCount++;
+                printUtils.printWithColor("Documentation generated and saved to " + docPath, "yellow");
+            } else {
+                printUtils.printWithColor(statusRsp.getValue(), "red");
+            }
+
+
+            // 延迟下一次请求
+            Thread.sleep(Integer.parseInt(Objects.requireNonNull(configs.get("REQUEST_INTERVAL"))));
 
 
         }
-
+        printUtils.printWithColor("Documentation generation phase completed. "+docCount+" docs generated.", "yellow");
 
     }
 
-    private static Map<String, String> readDocContent(String path) throws IOException {
-        return new HashMap<>(); // Implement file reading logic
-    }
-
-    private static void writeDocContent(String path, Map<String, String> content) throws IOException {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(path))) {
-            writer.write(content.toString());
-        }
-    }
 
 }
