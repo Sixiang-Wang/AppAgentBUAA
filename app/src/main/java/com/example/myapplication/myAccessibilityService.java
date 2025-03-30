@@ -1,9 +1,15 @@
 package com.example.myapplication;
 
+
+import static androidx.core.view.KeyEventDispatcher.dispatchKeyEvent;
 import static com.example.myapplication.activity.MainActivity.TAG;
 import static com.example.myapplication.scripts.androidController.height;
 import static com.example.myapplication.scripts.androidController.width;
 
+import android.annotation.SuppressLint;
+import android.app.Instrumentation;
+import android.view.KeyEvent;
+import android.view.View;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.accessibilityservice.InputMethod;
@@ -15,6 +21,7 @@ import android.content.pm.ResolveInfo;
 import android.graphics.Rect;
 import android.os.Build;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -295,6 +302,10 @@ public class myAccessibilityService extends AccessibilityService {
         static AccessibilityWindowInfo getWindow(AccessibilityNodeInfo accessibilityNodeInfo) {
             return accessibilityNodeInfo.getWindow();
         }
+    }
+
+    public void simulateBackKey() {
+        performGlobalAction(GLOBAL_ACTION_BACK);
     }
 
 

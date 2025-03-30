@@ -53,8 +53,8 @@ import android.view.accessibility.AccessibilityWindowInfo;
 
 public class androidController {
     Context context;
-    public static int width;
-    public static int height;
+    public static int width=1080;
+    public static int height=2000;
     String screenshot_dir;
     String xml_dir;
     String backslash;
@@ -271,18 +271,15 @@ public class androidController {
 
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
     public void tap(int x, int y) {
         if (myAccessibilityService.getInstance() == null) {
             Log.e(TAG, "无障碍服务实例为空，无法执行点击！");
             return;
         }
-
         Log.d(TAG, "开始执行点击: (" + x + ", " + y + ")");
-
         Path path = new Path();
         path.moveTo(x, y);
-        GestureDescription.StrokeDescription stroke = new GestureDescription.StrokeDescription(path, 100, 300);
+        GestureDescription.StrokeDescription stroke = new GestureDescription.StrokeDescription(path, 0, 100);
         GestureDescription.Builder builder = new GestureDescription.Builder();
         builder.addStroke(stroke);
         boolean success = myAccessibilityService.getInstance().dispatchGesture(
@@ -306,24 +303,84 @@ public class androidController {
     public void text(String inputText){
         Ut.text(inputText);
     }
+    public void longPress(int x, int y) {
+        if (myAccessibilityService.getInstance() == null) {
+            Log.e(TAG, "无障碍服务实例为空，无法执行点击！");
+            return;
+        }
+        Log.d(TAG, "开始执行点击: (" + x + ", " + y + ")");
+        Path path = new Path();
+        path.moveTo(x, y);
+        GestureDescription.StrokeDescription stroke = new GestureDescription.StrokeDescription(path, 0, 1000);
+        GestureDescription.Builder builder = new GestureDescription.Builder();
+        builder.addStroke(stroke);
+        boolean success = myAccessibilityService.getInstance().dispatchGesture(
+                builder.build(),
+                new AccessibilityService.GestureResultCallback() {
+                    @Override
+                    public void onCompleted(GestureDescription gestureDescription) {
+                        Log.d(TAG, "点击成功");
+                    }
+                    @Override
+                    public void onCancelled(GestureDescription gestureDescription) {
+                        Log.e(TAG, "点击被取消！");
+                    }
+                },
+                null
+        );
 
-//    public void text(String inputText) {
-//        if (myAccessibilityService.getInstance() == null) {
-//            Log.e(TAG, "无障碍服务实例为空，无法执行输入！");
-//            return;
-//        }
-//        InputMethod inputMethod = new InputMethod(myAccessibilityService.getInstance());;
-//        if (inputMethod == null) {
-//            Log.e(TAG, "输入法实例为空，无法执行输入！");
-//            return;
-//        }
-//        AccessibilityInputConnection connection = inputMethod.getCurrentInputConnection();
-//        if (connection == null) {
-//            Log.e(TAG, "当前输入连接为空，无法执行输入！");
-//            return;
-//        }
-//        connection.commitText(inputText, 1, null);  // 0表示光标位置
-//    }
+        Log.d(TAG, "dispatchGesture 返回值: " + success);
+    }
+
+
+    public void swipe(int x, int y, String direction, String dist, boolean quick) {
+        Log.d(TAG, "Begin to swipe " + x + " " + y + " " + direction + " " + dist + " " + quick);
+
+        int width = androidController.width;
+        int unitDist = (width / 10) * (dist.equals("long") ? 3 : dist.equals("medium") ? 2 : 1);
+
+        int offsetX = 0, offsetY = 0;
+        switch (direction) {
+            case "up":
+                offsetX = 0;
+                offsetY = -2 * unitDist;
+                break;
+            case "down":
+                offsetX = 0;
+                offsetY = 2 * unitDist;
+                break;
+            case "left":
+                offsetX = -unitDist;
+                offsetY = 0;
+                break;
+            case "right":
+                offsetX = unitDist;
+                offsetY = 0;
+                break;
+            default:
+                throw new IllegalArgumentException("Invalid direction " + direction);
+        }
+
+        long duration = quick ? 100 : 400;
+
+        Path path = new Path();
+        path.moveTo(x, y);
+        path.rLineTo(offsetX, offsetY);
+
+        GestureDescription.StrokeDescription stroke = new GestureDescription.StrokeDescription(path, 0, duration);
+        GestureDescription gesture = new GestureDescription.Builder().addStroke(stroke).build();
+
+        if (myAccessibilityService.getInstance() != null) {
+            myAccessibilityService.getInstance().dispatchGesture(gesture, null, null);
+        }
+
+        Log.d(TAG, "End to swipe " + x + " " + y + " " + direction + " " + dist + " " + quick);
+    }
+
+    public void back(){
+        myAccessibilityService.getInstance().simulateBackKey();
+    }
+
 
 
 

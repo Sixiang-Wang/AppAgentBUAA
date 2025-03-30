@@ -35,22 +35,32 @@ public class qwenModel extends baseModel {
         final Map.Entry<Boolean, String>[] resultHolder = new Map.Entry[1]; // 存储结果
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                String image = "file://" + images.get(0);
+                // 构建内容列表，包含所有图片和文本提示
+                List<Map<String, Object>> contentList = new ArrayList<>();
+                for (String imagePath : images) {
+                    String imageUri = "file://" + imagePath;
+                    contentList.add(Collections.singletonMap("image", imageUri));
+                }
+                contentList.add(Collections.singletonMap("text", prompt));
+
+                // 创建多模态消息
                 MultiModalMessage multiModalMessage = MultiModalMessage.builder()
                         .role(Role.USER.getValue())
-                        .content(List.of(
-                                Collections.singletonMap("image", image),
-                                Collections.singletonMap("text", prompt))).build();
+                        .content(contentList)
+                        .build();
+
+                // 创建多模态对话参数
                 MultiModalConversationParam multiModalConversationParam = MultiModalConversationParam.builder()
                         .model(model)
                         .apiKey(apiKey)
                         .message(multiModalMessage)
                         .build();
+                // 发起多模态对话
                 MultiModalConversation multiModalConversation = new MultiModalConversation();
                 Log.d(TAG, "开始 call");
-
                 MultiModalConversationResult result = multiModalConversation.call(multiModalConversationParam);
 
+                // 处理返回结果
                 String msg = (String) result.getOutput().getChoices().get(0).getMessage().getContent().get(0).get("text");
                 Log.d(TAG, "Qwen 回答结果: " + result);
                 resultHolder[0] = new AbstractMap.SimpleEntry<>(true, msg);
@@ -69,6 +79,49 @@ public class qwenModel extends baseModel {
         }
         return resultHolder[0]; // 返回结果
     }
+
+//    public Map.Entry<Boolean, String> getModelResponse(String prompt, List<String> images) {
+//        CountDownLatch latch = new CountDownLatch(1); // 创建一个同步锁
+//        final Map.Entry<Boolean, String>[] resultHolder = new Map.Entry[1]; // 存储结果
+//        Executors.newSingleThreadExecutor().execute(() -> {
+//            try {
+//
+//
+//                String image = "file://" + images.get(0);
+//                MultiModalMessage multiModalMessage = MultiModalMessage.builder()
+//                        .role(Role.USER.getValue())
+//                        .content(
+//                                List.of(
+//                                Collections.singletonMap("image", image),
+//                                Collections.singletonMap("text", prompt))
+//                        ).build();
+//                MultiModalConversationParam multiModalConversationParam = MultiModalConversationParam.builder()
+//                        .model(model)
+//                        .apiKey(apiKey)
+//                        .message(multiModalMessage)
+//                        .build();
+//                MultiModalConversation multiModalConversation = new MultiModalConversation();
+//                Log.d(TAG, "开始 call");
+//
+//                MultiModalConversationResult result = multiModalConversation.call(multiModalConversationParam);
+//                String msg = (String) result.getOutput().getChoices().get(0).getMessage().getContent().get(0).get("text");
+//                Log.d(TAG, "Qwen 回答结果: " + result);
+//                resultHolder[0] = new AbstractMap.SimpleEntry<>(true, msg);
+//            } catch (Exception e) {
+//                Log.e(TAG, "请求失败", e);
+//                resultHolder[0] = new AbstractMap.SimpleEntry<>(false, "请求失败: " + e.getMessage());
+//            } finally {
+//                latch.countDown(); // 释放锁，主线程继续执行
+//            }
+//        });
+//        try {
+//            latch.await(); // 主线程等待，直到子线程完成
+//        } catch (InterruptedException e) {
+//            Log.e(TAG, "等待线程被中断", e);
+//            return new AbstractMap.SimpleEntry<>(false, "线程被中断");
+//        }
+//        return resultHolder[0]; // 返回结果
+//    }
 
 
 }

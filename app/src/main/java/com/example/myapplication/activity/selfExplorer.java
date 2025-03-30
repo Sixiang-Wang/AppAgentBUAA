@@ -17,17 +17,22 @@ import com.example.myapplication.scripts.printUtils;
 import com.example.myapplication.scripts.qwenModel;
 import com.example.myapplication.scripts.responseParser;
 import com.example.myapplication.util.TaskPool;
+import com.google.gson.Gson;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -48,7 +53,7 @@ public class selfExplorer {
 
         //开发中测试用变量，将来必须让用户输入
         String app = "com.tencent.mm";
-        String task_desc = "打开微信,给张喆宇发送你好";
+        String task_desc = "打开微信,给张喆宇发送你好,记得点进张喆宇聊天界面后要点击输入框再输入文字";
         //获取文件配置
         Map<String, String> configs = loadConfig(this.context, "config.json");
 
@@ -105,9 +110,9 @@ public class selfExplorer {
         File reflect_log_path = new File(task_dir, "log_reflect_" + taskName + ".txt");
 
         //创建方法类
-        androidController androidController = new androidController(this.context);
-        int width = androidController.get_device_size().x;
-        int height = androidController.get_device_size().y;
+        androidController controller = new androidController(this.context);
+        int width = controller.get_device_size().x;
+        int height = controller.get_device_size().y;
         printUtils.printWithColor("Screen resolution of present device" + width + "x" + height, "yellow");
         printUtils.printWithColor("Please enter the description of the task you want me to complete in a few sentences:", "blue");
         int doc_count = 0;
@@ -121,19 +126,17 @@ public class selfExplorer {
         this.context.startActivity(intent);
         Thread.sleep(1000);
 
-
         //开始循环和模型进行通信
         while (round_count < Integer.parseInt(Objects.requireNonNull(configs.get("MAX_ROUNDS")))) {
             round_count++;
             printUtils.printWithColor("Round " + round_count, "yellow");
-            String screenshot_before = androidController.get_screenshot(round_count + "_before.png", task_dir.getAbsolutePath());
+            String screenshot_before = controller.get_screenshot(round_count + "_before.png", task_dir.getAbsolutePath());
             printUtils.printWithColor(screenshot_before, "yellow");
 
             Thread.sleep(1000);
-            String output_path = task_dir.getAbsolutePath() + "/" + round_count + "_before_labeled.png";
             Boolean dark_mode = Boolean.valueOf(configs.get("DARK_MODE"));
 
-            String xml_path = androidController.get_xml(round_count, task_dir);
+            String xml_path = controller.get_xml(round_count, task_dir);
             Thread.sleep(1000);
 
 
@@ -142,8 +145,8 @@ public class selfExplorer {
             List<androidElement> focusable_list = new ArrayList<>();
 
             //分析得到的xml文件，将clickable为true的AndroidElement（这是自己创建的类不是Android官方给的类）放进clickablelist里，focusable同理。
-            androidController.traverseTree(xml_path, clickable_list, "clickable", true);
-            androidController.traverseTree(xml_path, focusable_list, "focusable", true);
+            controller.traverseTree(xml_path, clickable_list, "clickable", true);
+            controller.traverseTree(xml_path, focusable_list, "focusable", true);
 
             //下面会把clickable_list和focusable_list里的AndroidElement放进elem_list里，优先放clickable为true的，然后放focusable为true并且不会靠已存在的AndroidElement太近的。
             List<androidElement> elem_list = new ArrayList<>();
@@ -175,18 +178,25 @@ public class selfExplorer {
                 }
             }
 
+
+            String  base64_img_before = task_dir.getAbsolutePath() + "/" + round_count + "_before_labeled.png";
             //将之前截的图，根据elem_list来绘制，得到一个标记了可点击点的屏幕截图
-            androidController.drawBoundingBoxes(screenshot_before, output_path, elem_list, false, dark_mode);
+            controller.drawBoundingBoxes(screenshot_before, base64_img_before, elem_list, false, dark_mode);
 
             //将标记后的屏幕截图连通一个prompt发给Qwen模型，得到它的回复。
             Map<String, String> prompts = loadConfig(this.context, "prompts.json");
             String prompt = prompts.get("self_explore_task_template").replace("<task_description>", task_desc);
             prompt = prompt.replace("<last_act>", last_act);
             printUtils.printWithColor("Thinking about what to do in the next step...", "yellow");
-            Map.Entry<Boolean, String> status_rsp = model.getModelResponse(prompt, Collections.singletonList(output_path));
+            Map.Entry<Boolean, String> status_rsp = model.getModelResponse(prompt, Collections.singletonList(base64_img_before));
+
+            //为了照顾python的变量随便用而不得不提取出来赋值
+            String act_name="tap";
+            String swipe_dir = "up";
+            int area=1;
 
             if (status_rsp.getKey()) {
-                //把此次回复的信息存进jason文件里。
+                //把此次回复的信息存进json文件里。
                 FileWriter logfile = new FileWriter(explore_log_path, true); // 以追加模式打开文件
                 JSONObject logItem = new JSONObject();
                 logItem.put("step", round_count);
@@ -197,34 +207,178 @@ public class selfExplorer {
                 logfile.close(); // 关闭文件
                 //分析大模型的回复，得到基本信息
                 ArrayList<String> res = responseParser.parseExploreRsp(status_rsp.getValue());
-                String act_name = res.get(0);
+                act_name = res.get(0);
                 last_act = res.get(res.size() - 1);
                 res.remove(res.size() - 1);
                 printUtils.printWithColor("开始分析回复得到信息", "yellow");
                 if (act_name.equals("FINISH")) {
                     task_complete = true;
                 }
-                if (act_name.equals("tap")) {
+                else if (act_name.equals("tap")) {
                     printUtils.printWithColor("开始点击！", "yellow");
-                    int area = Integer.parseInt(res.get(1));
+                    area = Integer.parseInt(res.get(1));
                     int[] bbox = elem_list.get(area - 1).bbox;
                     int x = (bbox[0] + bbox[2]) / 2;
                     int y = (bbox[1] + bbox[3]) / 2;
-                    androidController.tap(x, y);
-                    Thread.sleep(1000);
+                    controller.tap(x, y);
+
                 }
-                if (act_name.equals("text")) {
+                else if (act_name.equals("text")) {
                     printUtils.printWithColor("开始输入文字！", "yellow");
                     String input_str = res.get(1);
-                    androidController.text(input_str);
+                    controller.text(input_str);
 
-                    Thread.sleep(1000);
+
                 }
+                else if(act_name.equals("long_press")){
+                    printUtils.printWithColor("开始长按！", "yellow");
+                    area = Integer.parseInt(res.get(1));
+                    int[] bbox = elem_list.get(area - 1).bbox;
+                    int x = (bbox[0] + bbox[2]) / 2;
+                    int y = (bbox[1] + bbox[3]) / 2;
+                    controller.longPress(x,y);
+
+                }
+                else if(act_name.equals("swipe")){
+                    printUtils.printWithColor("开始滑动！", "yellow");
+                    area = Integer.parseInt(res.get(1));
+                    int[] bbox = elem_list.get(area - 1).bbox;
+                    int x = (bbox[0] + bbox[2]) / 2;
+                    int y = (bbox[1] + bbox[3]) / 2;
+                    swipe_dir = res.get(2);
+                    String dist = res.get(3);
+                    controller.swipe(x,y,swipe_dir,dist,false);
+                }else{
+                    break;
+                }
+                Thread.sleep(Integer.parseInt(configs.get("REQUEST_INTERVAL")));
             } else {
-                printUtils.printWithColor(status_rsp.getValue(), "yellow");
+                printUtils.printWithColor(status_rsp.getValue(), "red");
+                break;
             }
+            String screenshot_after = controller.get_screenshot(round_count + "_after.png",task_dir.getAbsolutePath());
+            printUtils.printWithColor(screenshot_after, "yellow");
 
+            String base64_img_after = task_dir.getAbsolutePath() + "/" + round_count + "_after_labeled.png";
+            controller.drawBoundingBoxes(screenshot_after,base64_img_after,elem_list,false,dark_mode);
 
+            if(act_name.equals("tap")){
+                prompt = prompts.get("self_explore_reflect_template").replace("<action>", "tapping");
+            }else if(act_name.equals("text")){
+                continue;
+            }else if(act_name.equals("long_press")){
+                prompt = prompts.get("self_explore_reflect_template").replace("<action>", "long pressing");
+            }else if(act_name.equals("swipe")){
+                if(swipe_dir.equals("up") || swipe_dir.equals("down")){
+                    act_name="v_swipe";
+                }else if(swipe_dir.equals("left") || swipe_dir.equals("right")){
+                    act_name="h_swipe";
+                }
+                prompt=prompts.get("self_explore_reflect_template").replace("<action>", "swiping");
+            }else{
+                printUtils.printWithColor("ERROR: Undefined act!","red");
+                break;
+            }
+            prompt = prompt.replace("<ui_element>",String.valueOf(area));
+            prompt = prompt.replace("<task_desc>",task_desc);
+            prompt = prompt.replace("<last_act>",last_act);
+
+            printUtils.printWithColor("Reflecting on my previous action...","yellow");
+            status_rsp = model.getModelResponse(prompt, Arrays.asList(base64_img_before, base64_img_after));
+
+            if (status_rsp.getKey()) {
+                String resource_id = elem_list.get(area-1).uid;
+                //把此次回复的信息存进json文件里。
+                FileWriter logfile = new FileWriter(reflect_log_path, true); // 以追加模式打开文件
+                JSONObject logItem = new JSONObject();
+                logItem.put("step", round_count);
+                logItem.put("prompt", prompt);
+                logItem.put("image_before", round_count + "_before_labeled.png");
+                logItem.put("image_after", round_count + "_after_labeled.png");
+                logItem.put("response", status_rsp.getValue());
+                logfile.write(logItem.toString() + "\n"); // 写入JSON字符串并加上换行符
+                logfile.close(); // 关闭文件
+                ArrayList<String> res = responseParser.parseReflectRsp(status_rsp.getValue());
+                String decision = res.get(0);
+                if(decision.equals("ERROR")){
+                    break;
+                }
+                if(decision.equals("INEFFECTIVE")){
+                    useless_list.add(resource_id);
+                    last_act="None";
+                } else if(decision.equals("BACK") || decision.equals("CONTINUE")||decision.equals("SUCCESS")) {
+
+                    if(decision.equals("BACK") || decision.equals("CONTINUE")){
+                        useless_list.add(resource_id);
+                        last_act="None";
+                        if(decision.equals("BACK")){
+                            controller.back();
+                        }
+                    }
+
+                    String doc = res.get(res.size()-1);
+                    String doc_name = resource_id+".txt";
+                    File doc_path = new File(docs_dir,doc_name);
+                    Map<String,String> doc_content = null;
+                    if(doc_path.exists()){
+                        try{
+                            // 读取文件内容
+                            BufferedReader reader = new BufferedReader(new FileReader(doc_path));
+                            StringBuilder fileContent = new StringBuilder();
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                fileContent.append(line);
+                            }
+                            reader.close();
+                            // 使用 Gson 或类似的库解析内容为 Map
+                            Gson gson = new Gson();
+                            doc_content = gson.fromJson(fileContent.toString(), Map.class);
+                            // 检查 doc_content 中是否包含 act_name 并且值不为空、非假
+                            if (doc_content.containsKey(act_name) && doc_content.get(act_name) != null && !doc_content.get(act_name).toString().isEmpty()) {
+                                System.out.println("Documentation for the element " + resource_id + " already exists.");
+                                continue;  // 跳过当前文档的处理
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    } else{
+                        // 如果文件不存在，创建新的文档内容
+                        doc_content = new HashMap<>();
+                        doc_content.put("tap", "");
+                        doc_content.put("text", "");
+                        doc_content.put("v_swipe", "");
+                        doc_content.put("h_swipe", "");
+                        doc_content.put("long_press", "");
+                    }
+                    doc_content.put(act_name, doc);
+                    try {
+                        // 将更新后的文档内容写回文件
+                        FileWriter writer = new FileWriter(doc_path);
+                        Gson gson = new Gson();
+                        String docContentJson = gson.toJson(doc_content);
+                        writer.write(docContentJson);
+                        writer.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    doc_count++;  // 增加文档计数
+                    printUtils.printWithColor("Documentation generated and saved to " + doc_path.getAbsolutePath(),"yellow");
+                }else{
+                    printUtils.printWithColor("ERROR: Undefined decision! +"+decision,"red");
+                    break;
+                }
+            }else{
+                printUtils.printWithColor(status_rsp.getValue(),"red");
+                break;
+            }
+            Thread.sleep(Integer.parseInt(configs.get("REQUEST_INTERVAL")));
+        }
+        if(task_complete){
+            printUtils.printWithColor("Autonomous exploration completed successfully. "+doc_count+" docs generated.","yellow");
+        }else if(round_count == Integer.parseInt(Objects.requireNonNull(configs.get("MAX_ROUNDS")))){
+            printUtils.printWithColor("Autonomous exploration finished due to reaching max rounds. "+doc_count+" docs generated.","yellow");
+        }else{
+            printUtils.printWithColor("Autonomous exploration finished unexpectedly. "+doc_count+" docs generated.","red");
         }
     }
 }
