@@ -2,6 +2,8 @@ package com.example.myapplication.scripts;
 
 import static com.example.myapplication.scripts.config.loadConfig;
 
+import android.accessibilityservice.InputMethod;
+import android.accessibilityservice.InputMethod.AccessibilityInputConnection;
 import android.view.accessibility.AccessibilityWindowInfo;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
@@ -74,63 +76,23 @@ public class androidController {
     }
 
     //prefix 应该是形如1_before.png的东西
-    public String get_screenshot(String prefix,String save_dir){
-        TaskPool.CACHE.execute(() -> {
-            try {
-                Thread.sleep(200L);
-                TaskPool.MAIN.post(() -> MediaProjectionService.screenshot(prefix, save_dir));
-                Thread.sleep(200L);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        });
-        return save_dir+"/"+prefix;
+    public String get_screenshot(String prefix, String save_dir) {
+
+        MediaProjectionService.screenshot(prefix, save_dir);
+
+        return save_dir + "/" + prefix;
+
     }
 
-    public interface Callback<T> {
-        void onComplete(T result) throws IOException, JSONException;
-    }
-
-    public void get_xml(int round_count, File task_dir, Callback<String> callback){
+    public String get_xml(int round_count, File task_dir){
         if(myAccessibilityService.getInstance()!=null){
             ToastUtils.longCall("保存开始");
             String round_count_string = String.valueOf(round_count);
-
-            CountDownLatch latch = new CountDownLatch(1);  // 计数器，初始值为1
-            String[] resultPath = new String[1]; // 存储 XML 文件路径
-            TaskPool.CACHE.execute(() -> {
-                try {
-                    Thread.sleep(2000L);
-                    TaskPool.MAIN.post(() ->
-                            {
-                                myAccessibilityService.getInstance().saveUiHierarchy(round_count_string, task_dir.getAbsolutePath());
-                                resultPath[0] = task_dir.getAbsolutePath() + "/" + round_count_string + ".xml";
-                                latch.countDown();  // 任务完成，释放锁
-                            }
-                    );
-                    Thread.sleep(200L);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            });
-            new Thread(() -> {
-                try {
-                    latch.await();  // 在子线程等待
-                    TaskPool.MAIN.post(() -> {
-                        try {
-                            callback.onComplete(resultPath[0]);
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        } catch (JSONException e) {
-                            throw new RuntimeException(e);
-                        }
-                    });  // 回到主线程
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }).start();
+            myAccessibilityService.getInstance().saveUiHierarchy(round_count_string, task_dir.getAbsolutePath());
+            return task_dir.getAbsolutePath()+"/"+round_count_string+".xml";
         }else{
             ToastUtils.longCall("无障碍未启动！");
+            return null;
         }
     }
 
@@ -206,7 +168,6 @@ public class androidController {
     }
 
     private int[] parseBounds(String bounds) {
-        printUtils.printWithColor(bounds,"yellow");
         String[] parts = bounds.split("]\\["); // 直接拆分
         parts[0] = parts[0].replace("[", ""); // 去掉第一个 "["
         parts[1] = parts[1].replace("]", ""); // 去掉第二个 "]"
@@ -292,9 +253,6 @@ public class androidController {
 
                 // 绘制文本
                 canvas.drawText(label, textX, textY, textPaint);
-
-
-
             } catch (Exception e) {
                 System.out.println("ERROR: Exception occurred while labeling the image\n" + e.getMessage());
             }
@@ -324,7 +282,6 @@ public class androidController {
 
         Path path = new Path();
         path.moveTo(x, y);
-        path.lineTo(x,y);
         GestureDescription.StrokeDescription stroke = new GestureDescription.StrokeDescription(path, 100, 300);
         GestureDescription.Builder builder = new GestureDescription.Builder();
         builder.addStroke(stroke);
@@ -346,55 +303,29 @@ public class androidController {
         Log.d(TAG, "dispatchGesture 返回值: " + success);
     }
 
-
-    public void text(String inputText) {
-        if (myAccessibilityService.getInstance() == null) {
-            Log.e(TAG, "无障碍服务实例为空，无法执行输入！");
-            return;
-        }
-        List<AccessibilityWindowInfo> windows = myAccessibilityService.getInstance().getWindows();
-        for (AccessibilityWindowInfo window : windows) {
-            // 只操作前台应用的窗口
-            if (window.getType() == AccessibilityWindowInfo.TYPE_APPLICATION) {
-                AccessibilityNodeInfo rootNode = window.getRoot();
-                if (rootNode != null) {
-                    Log.d(TAG, "Found application window, searching for input field...");
-                    if (findAndInputText(rootNode, inputText)) {
-                        Log.d(TAG, "Text input successful: " + inputText);
-                    } else {
-                        Log.d(TAG, "No input field found.");
-                    }
-                    return; // 只处理第一个找到的应用窗口
-                }
-            }
-        }
-        Log.d(TAG, "No application window found.");
+    public void text(String inputText){
+        Ut.text(inputText);
     }
 
-    /**
-     * 遍历 UI 树，查找 EditText 并输入文本
-     */
-    private boolean findAndInputText(AccessibilityNodeInfo node, String text) {
-        if (node == null) return false;
+//    public void text(String inputText) {
+//        if (myAccessibilityService.getInstance() == null) {
+//            Log.e(TAG, "无障碍服务实例为空，无法执行输入！");
+//            return;
+//        }
+//        InputMethod inputMethod = new InputMethod(myAccessibilityService.getInstance());;
+//        if (inputMethod == null) {
+//            Log.e(TAG, "输入法实例为空，无法执行输入！");
+//            return;
+//        }
+//        AccessibilityInputConnection connection = inputMethod.getCurrentInputConnection();
+//        if (connection == null) {
+//            Log.e(TAG, "当前输入连接为空，无法执行输入！");
+//            return;
+//        }
+//        connection.commitText(inputText, 1, null);  // 0表示光标位置
+//    }
 
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo child = node.getChild(i);
-            if (child == null) continue;
 
-            // 检查是否是输入框
-            if (child.getClassName() != null && child.getClassName().toString().contains("EditText")) {
-                child.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
-                Bundle args = new Bundle();
-                args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text);
-                boolean result = child.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args);
-                return result; // 找到输入框并成功输入后返回 true
-            }
-            if (findAndInputText(child, text)) {
-                return true; // 递归查找成功
-            }
-        }
-        return false;
-    }
 
 
 

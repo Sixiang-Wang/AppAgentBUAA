@@ -9,15 +9,21 @@ public class ToastUtils {
     private static Toast mToast;
 
     public static void shortCall(String text) {
-        cancel();
-        mToast = Toast.makeText(App.getApp(), text, Toast.LENGTH_SHORT);
-        mToast.show();
+        TaskPool.MAIN.post(()->{
+            cancel();
+            mToast = Toast.makeText(App.getApp(), text, Toast.LENGTH_SHORT);
+            mToast.show();
+        });
     }
 
-    public static void longCall(String text) {
-        cancel();
-        mToast = Toast.makeText(App.getApp(), text, Toast.LENGTH_LONG);
-        mToast.show();
+    public static void longCall(final String text) {
+        TaskPool.MAIN.post(()->{
+            cancel();
+            mToast = Toast.makeText(App.getApp(), text, Toast.LENGTH_LONG);
+            mToast.show();
+        });
+
+
     }
 
     private static void cancel() {

@@ -5,16 +5,22 @@ import static com.example.myapplication.scripts.androidController.height;
 import static com.example.myapplication.scripts.androidController.width;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.AccessibilityServiceInfo;
+import android.accessibilityservice.InputMethod;
+import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Rect;
 import android.os.Build;
 import android.util.Log;
+import android.view.View;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.util.Xml;
 import android.view.accessibility.AccessibilityWindowInfo;
+import android.view.inputmethod.InputConnection;
 
 
 import org.xmlpull.v1.XmlSerializer;
@@ -23,6 +29,11 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
+import android.view.inputmethod.InputConnection;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
+
 
 public class myAccessibilityService extends AccessibilityService {
     private static final String[] NAF_EXCLUDED_CLASSES = new String[] {
@@ -38,6 +49,15 @@ public class myAccessibilityService extends AccessibilityService {
         instance = this; // 保存实例，供外部调用
     }
 
+    private void configServiceInfo() {
+        AccessibilityServiceInfo serviceInfo = new AccessibilityServiceInfo();
+        serviceInfo.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
+        serviceInfo.flags = AccessibilityServiceInfo.DEFAULT |
+                AccessibilityServiceInfo.FLAG_INPUT_METHOD_EDITOR | AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS | AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS;
+        // 将配置好的 serviceInfo 设置到无障碍服务中
+        setServiceInfo(serviceInfo);
+    }
+
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
@@ -47,6 +67,7 @@ public class myAccessibilityService extends AccessibilityService {
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
+        configServiceInfo();
         Log.d("MyAccessibilityService", "Accessibility Service Connected!");
     }
 
@@ -275,6 +296,7 @@ public class myAccessibilityService extends AccessibilityService {
             return accessibilityNodeInfo.getWindow();
         }
     }
+
 
 
 

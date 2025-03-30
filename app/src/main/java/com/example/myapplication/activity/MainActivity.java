@@ -44,10 +44,7 @@ public class MainActivity extends AppCompatActivity {
     public static String TAG = "MainActivity";
     private static final String ACCESSIBILITY_SERVICE_ID = "com.example.myapplication/.MyAccessibilityService";
 
-    //以下几个变量是为了避免“在lambda表达式里不得使用变量”的问题，此问题导致我只能把startLearn里的变量提升为类变量。
-    String last_act = "None";
-    Boolean task_complete = false;
-    int round_count = 0;
+
 
 
     @Override
@@ -83,25 +80,24 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         binding.btnStartJiaoben.setOnClickListener(v -> {
-            try {
-                selfExplorer selfExplorer = new selfExplorer(this);
-                selfExplorer.startSelfExplorer();
-            } catch (InterruptedException | IOException | JSONException e) {
-                throw new RuntimeException(e);
-            }
+            selfExplorer selfExplorer = new selfExplorer(this);
+            new Thread(() -> {
+                try {
+                    selfExplorer.startSelfExplorer();
+                } catch (InterruptedException | JSONException | IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }).start();
         });
         binding.btnStartAccessibility.setOnClickListener(v -> {
             checkAccessibilityService();
         });
     }
-
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         MediaProjectionHelper.onStartResult(requestCode, resultCode, data);
     }
-
-
 
     public void checkAccessibilityService(){
         // 检查无障碍服务是否已启用

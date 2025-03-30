@@ -2,10 +2,11 @@
     android:description="@string/accessibility_service_desc"
     android:accessibilityEventTypes="typeAllMask"
     android:accessibilityFeedbackType="feedbackAllMask"
-    android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews"
-    android:canRetrieveWindowContent="true"
+    android:accessibilityFlags="flagDefault|flagInputMethodEditor|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews"
     android:canRequestTouchExplorationMode="true"
     android:canRequestEnhancedWebAccessibility="true"
     android:canRequestFilterKeyEvents="true"
     android:canPerformGestures="true"
+    android:canRetrieveWindowContent="true"
+    android:canTakeScreenshot="true"
     android:notificationTimeout="100" />
