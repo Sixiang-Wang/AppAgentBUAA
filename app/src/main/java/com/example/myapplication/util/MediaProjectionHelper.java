@@ -15,7 +15,7 @@ import com.example.myapplication.services.MediaProjectionService;
 public class MediaProjectionHelper {
     private static final MediaProjectionManager MEDIA_PROJECTION_MANAGER = (MediaProjectionManager) App.getApp().getSystemService(Context.MEDIA_PROJECTION_SERVICE);
     private static final Intent SERVICE_INTENT = new Intent(App.getApp(), MediaProjectionService.class);
-    private static boolean mStarted = false;
+    public static boolean mStarted = false;
 
     public static MediaProjectionManager getManager() {
         return MEDIA_PROJECTION_MANAGER;

@@ -1,5 +1,8 @@
 package com.example.myapplication.activity;
 
+import static com.example.myapplication.scripts.androidController.appendToFile;
+import static com.example.myapplication.scripts.androidController.completed_tasks_and_status;
+import static com.example.myapplication.scripts.androidController.tasks_and_status;
 import static com.example.myapplication.scripts.config.loadConfig;
 
 import android.content.Context;
@@ -11,23 +14,28 @@ import android.util.Log;
 import static com.example.myapplication.activity.MainActivity.TAG;
 
 import com.example.myapplication.App;
+import com.example.myapplication.myAccessibilityService;
 import com.example.myapplication.scripts.androidController;
 import com.example.myapplication.scripts.androidElement;
+import com.example.myapplication.scripts.baseModel;
 import com.example.myapplication.scripts.printUtils;
 import com.example.myapplication.scripts.qwenModel;
 import com.example.myapplication.scripts.responseParser;
 import com.example.myapplication.util.TaskPool;
+import com.example.myapplication.util.ToastUtils;
 import com.google.gson.Gson;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -40,28 +48,29 @@ import java.util.concurrent.CountDownLatch;
 
 public class selfExplorer {
     Context context;
+    String app;
+    String task_desc;
 
-    public selfExplorer(Context context) {
+
+    public selfExplorer(Context context,String app,String task_desc)
+    {
+        this.app=app;
+        this.task_desc=task_desc;
         this.context = context;
     }
 
     public void startSelfExplorer() throws InterruptedException, IOException, JSONException {
-        //以下几个变量是为了避免“在lambda表达式里不得使用变量”的问题，此问题导致我只能把startLearn里的变量提升为类变量。
+
         String last_act = "None";
         Boolean task_complete = false;
         int round_count = 0;
+        // String current_progress = "None";
 
-        //开发中测试用变量，将来必须让用户输入
-        String app = "com.tencent.mm";
-        String task_desc = "打开微信,给张喆宇发送你好,记得点进张喆宇聊天界面后要点击输入框再输入文字";
         //获取文件配置
         Map<String, String> configs = loadConfig(this.context, "config.json");
 
         //建立通信模型，这里很屎因为我还没把openAiModel给弄懂。
-        qwenModel model = new qwenModel(
-                configs.get("DASHSCOPE_API_KEY"),
-                configs.get("QWEN_MODEL")
-        );
+        baseModel model = null;
         if (configs.get("MODEL").equals("OpenAI")) {
             // 这个还没修改，暂时不用
             Log.d(TAG, "openAI还没修改完");
@@ -75,10 +84,10 @@ public class selfExplorer {
             return;
         }
         //文件路径，该测试所用到的文件路径在这里定义。File定义下给出了一个例子方便理解
-        Log.d(TAG, "MainActivity 创建完成");
         final File root_dir = new File(App.getApp().getExternalFilesDir(null).getParent());
         // /storage/emulated/0/Android/data/com.example.myapplication
         Log.d(TAG, this.context.getFilesDir().toString());//
+        File prompt_dir = new File(root_dir,"record.txt");
         File work_dir = new File(root_dir, "apps");
         // /storage/emulated/0/Android/data/com.example.myapplication/apps
         if (!work_dir.exists()) {
@@ -116,7 +125,6 @@ public class selfExplorer {
         printUtils.printWithColor("Screen resolution of present device" + width + "x" + height, "yellow");
         printUtils.printWithColor("Please enter the description of the task you want me to complete in a few sentences:", "blue");
         int doc_count = 0;
-
         List<String> useless_list = new ArrayList<>();
 
         //回到桌面
@@ -126,30 +134,42 @@ public class selfExplorer {
         this.context.startActivity(intent);
         Thread.sleep(1000);
 
+
+        //任务拆分
+        Map<String, String> prompts = loadConfig(this.context, "prompts.json");
+        String task_split = prompts.get("split_task_template");
+        task_split = task_split.replace("<task_description>",task_desc);
+
+        appendToFile(prompt_dir,task_split);
+
+        Map.Entry<Boolean, String> task_rsp = model.getModelResponse_tasksplit(task_split);
+        ArrayList<Map.Entry<String, Boolean>> tasks = controller.parseSteps(task_rsp.getValue());
+        int current_task_number = 1;
+
+
         //开始循环和模型进行通信
         while (round_count < Integer.parseInt(Objects.requireNonNull(configs.get("MAX_ROUNDS")))) {
             round_count++;
             printUtils.printWithColor("Round " + round_count, "yellow");
             String screenshot_before = controller.get_screenshot(round_count + "_before.png", task_dir.getAbsolutePath());
             printUtils.printWithColor(screenshot_before, "yellow");
-
             Thread.sleep(1000);
             Boolean dark_mode = Boolean.valueOf(configs.get("DARK_MODE"));
 
-            String xml_path = controller.get_xml(round_count, task_dir);
-            Thread.sleep(1000);
-
+            String xml_path = controller.get_xml_2(String.valueOf(round_count), task_dir);
+            Thread.sleep(2000);
 
             printUtils.printWithColor("XML 文件路径：" + xml_path, "yellow");
             List<androidElement> clickable_list = new ArrayList<>();
             List<androidElement> focusable_list = new ArrayList<>();
-
+            Thread.sleep(100);
             //分析得到的xml文件，将clickable为true的AndroidElement（这是自己创建的类不是Android官方给的类）放进clickablelist里，focusable同理。
             controller.traverseTree(xml_path, clickable_list, "clickable", true);
             controller.traverseTree(xml_path, focusable_list, "focusable", true);
 
             //下面会把clickable_list和focusable_list里的AndroidElement放进elem_list里，优先放clickable为true的，然后放focusable为true并且不会靠已存在的AndroidElement太近的。
             List<androidElement> elem_list = new ArrayList<>();
+
             for (androidElement elem : clickable_list) {
                 if (useless_list.contains(elem.uid)) {
                     continue;
@@ -179,22 +199,41 @@ public class selfExplorer {
             }
 
 
+
             String  base64_img_before = task_dir.getAbsolutePath() + "/" + round_count + "_before_labeled.png";
             //将之前截的图，根据elem_list来绘制，得到一个标记了可点击点的屏幕截图
             controller.drawBoundingBoxes(screenshot_before, base64_img_before, elem_list, false, dark_mode);
+            Thread.sleep(1000);
+
 
             //将标记后的屏幕截图连通一个prompt发给Qwen模型，得到它的回复。
-            Map<String, String> prompts = loadConfig(this.context, "prompts.json");
+
             String prompt = prompts.get("self_explore_task_template").replace("<task_description>", task_desc);
+            prompt = prompt.replace("<tasks>",tasks_and_status(tasks));
             prompt = prompt.replace("<last_act>", last_act);
+
+            if(current_task_number>tasks.size()){
+                prompt = prompt.replace("<current_task>","All tasks has completed!");
+            }else{
+                prompt = prompt.replace("<current_task>",tasks.get(current_task_number-1).getKey());
+            }
+
+            appendToFile(prompt_dir,prompt);
+
+            printUtils.printWithColor(last_act,"red");
+            printUtils.printWithColor(tasks_and_status(tasks),"red");
+            printUtils.printWithColor(completed_tasks_and_status(tasks,current_task_number),"red");
+
+
+
             printUtils.printWithColor("Thinking about what to do in the next step...", "yellow");
             Map.Entry<Boolean, String> status_rsp = model.getModelResponse(prompt, Collections.singletonList(base64_img_before));
 
             //为了照顾python的变量随便用而不得不提取出来赋值
-            String act_name="tap";
+            String act_name= "tap";
             String swipe_dir = "up";
             int area=1;
-
+            String input_str=null;
             if (status_rsp.getKey()) {
                 //把此次回复的信息存进json文件里。
                 FileWriter logfile = new FileWriter(explore_log_path, true); // 以追加模式打开文件
@@ -211,6 +250,7 @@ public class selfExplorer {
                 last_act = res.get(res.size() - 1);
                 res.remove(res.size() - 1);
                 printUtils.printWithColor("开始分析回复得到信息", "yellow");
+
                 if (act_name.equals("FINISH")) {
                     task_complete = true;
                 }
@@ -221,13 +261,13 @@ public class selfExplorer {
                     int x = (bbox[0] + bbox[2]) / 2;
                     int y = (bbox[1] + bbox[3]) / 2;
                     controller.tap(x, y);
-
+                    Thread.sleep(1000);
                 }
                 else if (act_name.equals("text")) {
                     printUtils.printWithColor("开始输入文字！", "yellow");
-                    String input_str = res.get(1);
+                    input_str = res.get(1);
                     controller.text(input_str);
-
+                    Thread.sleep(1000);
 
                 }
                 else if(act_name.equals("long_press")){
@@ -237,7 +277,7 @@ public class selfExplorer {
                     int x = (bbox[0] + bbox[2]) / 2;
                     int y = (bbox[1] + bbox[3]) / 2;
                     controller.longPress(x,y);
-
+                    Thread.sleep(1000);
                 }
                 else if(act_name.equals("swipe")){
                     printUtils.printWithColor("开始滑动！", "yellow");
@@ -248,6 +288,7 @@ public class selfExplorer {
                     swipe_dir = res.get(2);
                     String dist = res.get(3);
                     controller.swipe(x,y,swipe_dir,dist,false);
+                    Thread.sleep(1000);
                 }else{
                     break;
                 }
@@ -256,16 +297,16 @@ public class selfExplorer {
                 printUtils.printWithColor(status_rsp.getValue(), "red");
                 break;
             }
+
+
+            Thread.sleep(1000);
             String screenshot_after = controller.get_screenshot(round_count + "_after.png",task_dir.getAbsolutePath());
             printUtils.printWithColor(screenshot_after, "yellow");
-
-            String base64_img_after = task_dir.getAbsolutePath() + "/" + round_count + "_after_labeled.png";
-            controller.drawBoundingBoxes(screenshot_after,base64_img_after,elem_list,false,dark_mode);
 
             if(act_name.equals("tap")){
                 prompt = prompts.get("self_explore_reflect_template").replace("<action>", "tapping");
             }else if(act_name.equals("text")){
-                continue;
+                prompt = prompts.get("self_explore_reflect_template").replace("<action>", "text("+input_str+")");
             }else if(act_name.equals("long_press")){
                 prompt = prompts.get("self_explore_reflect_template").replace("<action>", "long pressing");
             }else if(act_name.equals("swipe")){
@@ -275,16 +316,29 @@ public class selfExplorer {
                     act_name="h_swipe";
                 }
                 prompt=prompts.get("self_explore_reflect_template").replace("<action>", "swiping");
+            }else if(act_name.equals("FINISH")){
+                printUtils.printWithColor("the task has completed!","red");
+                ToastUtils.shortCall("学习任务完成！");
+                break;
             }else{
+                ToastUtils.shortCall("学习任务失败！大模型给出了未知动作！");
                 printUtils.printWithColor("ERROR: Undefined act!","red");
                 break;
             }
             prompt = prompt.replace("<ui_element>",String.valueOf(area));
             prompt = prompt.replace("<task_desc>",task_desc);
             prompt = prompt.replace("<last_act>",last_act);
+            if(current_task_number>tasks.size()){
+                prompt = prompt.replace("<current_task>","All tasks has completed!");
+            }else{
+                prompt = prompt.replace("<current_task>",tasks.get(current_task_number-1).getKey());
+            }
 
+
+
+            appendToFile(prompt_dir,prompt);
             printUtils.printWithColor("Reflecting on my previous action...","yellow");
-            status_rsp = model.getModelResponse(prompt, Arrays.asList(base64_img_before, base64_img_after));
+            status_rsp = model.getModelResponse(prompt, Arrays.asList(base64_img_before, screenshot_after));
 
             if (status_rsp.getKey()) {
                 String resource_id = elem_list.get(area-1).uid;
@@ -296,7 +350,7 @@ public class selfExplorer {
                 logItem.put("image_before", round_count + "_before_labeled.png");
                 logItem.put("image_after", round_count + "_after_labeled.png");
                 logItem.put("response", status_rsp.getValue());
-                logfile.write(logItem.toString() + "\n"); // 写入JSON字符串并加上换行符
+                logfile.write(logItem + "\n"); // 写入JSON字符串并加上换行符
                 logfile.close(); // 关闭文件
                 ArrayList<String> res = responseParser.parseReflectRsp(status_rsp.getValue());
                 String decision = res.get(0);
@@ -306,13 +360,20 @@ public class selfExplorer {
                 if(decision.equals("INEFFECTIVE")){
                     useless_list.add(resource_id);
                     last_act="None";
-                } else if(decision.equals("BACK") || decision.equals("CONTINUE")||decision.equals("SUCCESS")) {
+                } else if(decision.equals("BACK") || decision.equals("CONTINUE")||decision.equals("NOT_COMPLETELY_SUCCESS")||decision.equals("COMPLETELY_SUCCESS")) {
 
                     if(decision.equals("BACK") || decision.equals("CONTINUE")){
                         useless_list.add(resource_id);
                         last_act="None";
                         if(decision.equals("BACK")){
                             controller.back();
+                        }
+                    }else if(decision.equals("COMPLETELY_SUCCESS") && current_task_number!=tasks.size()+1){
+                        Map.Entry<String, Boolean> temp = tasks.get(current_task_number-1);
+                        Map.Entry<String, Boolean> updatedTask = new AbstractMap.SimpleEntry<>(temp.getKey(), true);
+                        tasks.set(current_task_number-1, updatedTask);
+                        if(current_task_number<=tasks.size()){
+                            current_task_number++;
                         }
                     }
 
@@ -381,4 +442,8 @@ public class selfExplorer {
             printUtils.printWithColor("Autonomous exploration finished unexpectedly. "+doc_count+" docs generated.","red");
         }
     }
+
+
+
+
 }

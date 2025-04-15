@@ -1,117 +1,190 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    tools:context=".activity.MainActivity">
+    android:background="@drawable/background">
 
-    <RelativeLayout
-        style="@style/Item">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/mainButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="60dp"
+        android:padding="16dp"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:context=".activity.MainActivity"
+        tools:layout_editor_absoluteX="0dp">
+        <!-- 用户输入框 -->
         <TextView
-            style="@style/ItemTitle"
-            android:text="屏幕录制服务" />
+            android:id="@+id/tv_input"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="输入相关信息"
+            android:textColor="@color/black"
+            android:textSize="30sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <EditText
+            android:id="@+id/et_app"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:autofillHints=""
+            android:hint="输入 App 名称"
+            android:inputType="text"
+            android:minHeight="48dp"
+            android:textSize="30sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_input" />
+
+        <EditText
+
+            android:id="@+id/et_task_desc"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:autofillHints=""
+            android:hint="输入任务描述"
+            android:inputType="text"
+            android:minHeight="48dp"
+            android:textSize="30sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/et_app" />
+
+
+        <com.example.myapplication.view.PieChartView
+            android:id="@+id/pieChart"
+            android:layout_width="328dp"
+            android:layout_height="287dp"
+            android:layout_marginTop="50dp"
+            android:paddingTop="20dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/et_task_desc" />
+
+        <Button
+            android:id="@+id/btn_aiGuide"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:paddingTop="16dp"
+            android:paddingBottom="16dp"
+            android:text="AI指导"
+            android:textColor="@android:color/white"
+            android:textSize="30sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/pieChart" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/quanXian"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        tools:context=".activity.MainActivity"
+        tools:layout_editor_absoluteX="0dp"
+        tools:layout_editor_absoluteY="16dp">
+
+        <ImageButton
+            android:id="@+id/backButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_margin="8dp"
+            android:layout_marginTop="28dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="返回"
+            android:padding="12dp"
+            android:src="@drawable/ic_arrow_back"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/tv_screen_record"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="屏幕录制服务"
+            android:textColor="@color/black"
+            android:textSize="30sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/backButton" />
+
         <Button
             android:id="@+id/btn_start"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
-            android:layout_toStartOf="@+id/btn_stop"
-            android:layout_marginEnd="5dp"
-            android:text="启动" />
-        <Button
-            android:id="@+id/btn_stop"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
-            android:layout_alignParentEnd="true"
-            android:text="停止" />
-    </RelativeLayout>
+            android:paddingTop="16dp"
+            android:paddingBottom="16dp"
+            android:text="启动"
+            android:textColor="@android:color/white"
+            android:textSize="30sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_screen_record" />
 
-    <RelativeLayout
-        style="@style/Item">
+
         <TextView
-            style="@style/ItemTitle"
-            android:text="屏幕录制服务类型" />
-        <RadioGroup
-            android:id="@+id/rg_service_type"
+            android:id="@+id/tv_startAccessibility"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_centerVertical="true"
-            android:layout_alignParentEnd="true">
-            <RadioButton
-                android:id="@+id/rb_screenshot"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerVertical="true"
-                android:layout_toStartOf="@+id/btn_stop"
-                android:text="截图" />
-        </RadioGroup>
-    </RelativeLayout>
-
-    <RelativeLayout
-        style="@style/Item">
-        <TextView
-            style="@style/ItemTitle"
-            android:text="截图弹窗" />
-        <Button
-            android:id="@+id/btn_show_screenshot"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
-            android:layout_toStartOf="@+id/btn_hide_screenshot"
-            android:layout_marginEnd="5dp"
-            android:text="显示" />
-        <Button
-            android:id="@+id/btn_hide_screenshot"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
-            android:layout_alignParentEnd="true"
-            android:text="隐藏" />
-    </RelativeLayout>
-
-    <RelativeLayout
-        style="@style/Item">
-        <TextView
-            android:id="@+id/tv_script_service"
-            style="@style/ItemTitle"
-            android:text="脚本启动服务"
-            android:layout_alignParentStart="true"
-            android:layout_centerVertical="true" />
-
-        <Button
-            android:id="@+id/btn_startJiaoben"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="123dp"
-            android:layout_toEndOf="@id/tv_script_service"
-            android:text="启动" />
-    </RelativeLayout>
-
-
-
-
-
-
-    <RelativeLayout
-        style="@style/Item">
-        <TextView
-            android:id="@+id/tv_accessibility_service"
-            style="@style/ItemTitle"
-            android:text="启动无障碍服务"
-            android:layout_alignParentStart="true"
-            android:layout_centerVertical="true" />
+            android:layout_marginTop="16dp"
+            android:text="启用无障碍权限"
+            android:textColor="@color/black"
+            android:textSize="30sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/btn_start" />
 
         <Button
             android:id="@+id/btn_startAccessibility"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:paddingTop="16dp"
+            android:paddingBottom="16dp"
+            android:text="无障碍服务"
+            android:textSize="30sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_startAccessibility" />
+
+        <TextView
+            android:id="@+id/tv_startOverlay"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="121dp"
-            android:layout_toEndOf="@id/tv_accessibility_service"
-            android:text="启动" />
-    </RelativeLayout>
+            android:layout_marginTop="16dp"
+            android:text="启用悬浮窗权限"
+            android:textColor="@color/black"
+            android:textSize="30sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/btn_startAccessibility" />
 
-</LinearLayout>
+        <Button
+            android:id="@+id/btn_startOverlay"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:paddingTop="16dp"
+            android:paddingBottom="16dp"
+            android:text="悬浮窗服务"
+            android:textSize="30sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_startOverlay" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

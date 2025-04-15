@@ -30,7 +30,7 @@ public class DocGen {
         this.context=context;
     }
 
-    public  void startSelfExplorer() throws InterruptedException, IOException, JSONException {
+    public  void startDocGen() throws InterruptedException, IOException, JSONException {
 
         //开发中测试用变量，将来必须让用户输入
         String app = "com.zhihu.android";
@@ -92,9 +92,6 @@ public class DocGen {
 
         System.out.println("Starting to generate documentations for the app " + app + " based on the demo " + demoName);
         int docCount = 0;
-
-
-
 
         List<String> lines = new ArrayList<>();
         int step = 0;

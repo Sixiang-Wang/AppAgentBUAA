@@ -33,6 +33,16 @@ public class openAIModel extends baseModel {
         this.maxTokens = maxTokens;
     }
 
+    public Map.Entry<Boolean, String> getModelResponse_tasksplit(String prompt) {
+        return null;
+    }
+
+    public Map.Entry<Boolean, String> getModelResponse_keyword(String prompt){
+        return null;
+    }
+    public Map.Entry<Boolean, String> getModelResponse_keyword_2(String prompt){
+        return null;
+    }
     @Override
     public Map.Entry<Boolean, String> getModelResponse(String prompt, List<String> images) {
         try {

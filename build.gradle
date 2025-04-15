@@ -2,17 +2,18 @@
 buildscript {
     ext.kotlin_version = '1.8.0'
     repositories {
-        maven { url "https://chaquo.com/maven" } //添加行
+        google()
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
     }
     dependencies {
-        classpath "com.chaquo.python:gradle:16.0.0" //添加行
         classpath 'com.android.tools.build:gradle:8.1.4'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
+
 plugins {
     id 'com.android.application' version '8.1.4' apply false
     id 'com.android.library' version '8.1.4' apply false
     id 'com.chaquo.python' version '16.0.0' apply false
 }
-

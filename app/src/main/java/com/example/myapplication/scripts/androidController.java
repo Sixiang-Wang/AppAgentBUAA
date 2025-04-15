@@ -4,6 +4,8 @@ import static com.example.myapplication.scripts.config.loadConfig;
 
 import android.accessibilityservice.InputMethod;
 import android.accessibilityservice.InputMethod.AccessibilityInputConnection;
+import android.graphics.Typeface;
+import android.util.Xml;
 import android.view.accessibility.AccessibilityWindowInfo;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
@@ -22,6 +24,9 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.WindowMetrics;
 
+import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.uiautomator.UiDevice;
+
 import androidx.annotation.RequiresApi;
 import com.example.myapplication.myAccessibilityService;
 import com.example.myapplication.services.MediaProjectionService;
@@ -35,15 +40,22 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xmlpull.v1.XmlSerializer;
 
+import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -70,7 +82,7 @@ public class androidController {
         this.backslash="\\";
         this.MIN_DIST = Double.parseDouble(configs.get("MIN_DIST"));
     }
-    public Point get_device_size(){
+   public Point get_device_size(){
         WindowMetrics metrics = ((Activity) context).getWindowManager().getCurrentWindowMetrics();
         return new Point(metrics.getBounds().width(),metrics.getBounds().height());
     }
@@ -84,17 +96,23 @@ public class androidController {
 
     }
 
-    public String get_xml(int round_count, File task_dir){
+    public String get_xml_2(String prefix, File task_dir){
         if(myAccessibilityService.getInstance()!=null){
-            ToastUtils.longCall("保存开始");
-            String round_count_string = String.valueOf(round_count);
-            myAccessibilityService.getInstance().saveUiHierarchy(round_count_string, task_dir.getAbsolutePath());
+            ToastUtils.shortCall("保存开始");
+            String round_count_string = String.valueOf(prefix);
+
+            myAccessibilityService.NodeInfoWrapper root = myAccessibilityService.getInstance().getCompressedNodeTree();
+            myAccessibilityService.getInstance().exportToXml(root,task_dir.getAbsolutePath(),round_count_string);
+
             return task_dir.getAbsolutePath()+"/"+round_count_string+".xml";
         }else{
             ToastUtils.longCall("无障碍未启动！");
             return null;
         }
     }
+
+
+
 
     public void traverseTree(String xmlPath, List<androidElement> elemList, String attrib, boolean addIndex) {
         try {
@@ -113,7 +131,6 @@ public class androidController {
     }
     private void parseElement(Element elem, List<Element> path, List<androidElement> elemList, String attrib, boolean addIndex) {
         path.add(elem);
-
         if (elem.hasAttribute(attrib) && elem.getAttribute(attrib).equals("true")) {
             String parentPrefix = "";
             if (path.size() > 1) {
@@ -153,7 +170,8 @@ public class androidController {
                     Node node = attrMap.item(i);
                     attributes.put(node.getNodeName(), node.getNodeValue());
                 }
-                elemList.add(new androidElement(elemId, bbox, attrib));
+                float score = Float.parseFloat(elem.getAttribute("score"));
+                elemList.add(new androidElement(elemId, bbox, attrib,score,attributes));
             }
         }
 
@@ -199,17 +217,89 @@ public class androidController {
         }
         return elemId;
     }
+//    public void drawBoundingBoxes(String img_path,
+//                                  String output_path,
+//                                  List<androidElement> elemList,
+//                                  boolean recordMode,
+//                                  boolean darkMode) {
+//        Bitmap originalBitmap = BitmapFactory.decodeFile(img_path);
+//        Bitmap mutableBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true);
+//        Canvas canvas = new Canvas(mutableBitmap);
+//        Paint textPaint = new Paint();
+//        textPaint.setTextSize(60);  // 增大文字的大小
+//        textPaint.setAntiAlias(true);
+//
+//        // 为了增强对比度，给文字设置阴影
+//        textPaint.setShadowLayer(10f, 5f, 5f, Color.BLACK);  // 阴影效果，黑色阴影使文字更清晰
+//
+//        Paint borderPaint = new Paint();
+//        borderPaint.setStyle(Paint.Style.STROKE);
+//        borderPaint.setStrokeWidth(5);  // 设置边框的线宽
+//        int count = 1;
+//
+//        for (androidElement elem : elemList) {
+//            try {
+//                int left = elem.bbox[0];
+//                int top = elem.bbox[1];
+//                int right = elem.bbox[2];
+//                int bottom = elem.bbox[3];
+//
+//                // 选择边框颜色
+//                if (recordMode) {
+//                    if ("clickable".equals(elem.attrib)) {
+//                        borderPaint.setColor(Color.RED);
+//                    } else if ("focusable".equals(elem.attrib)) {
+//                        borderPaint.setColor(Color.BLUE);
+//                    } else {
+//                        borderPaint.setColor(Color.GREEN);
+//                    }
+//                } else {
+//                    borderPaint.setColor(Color.BLACK);  // 默认为黑色
+//                }
+//
+//                // 绘制边框
+//                canvas.drawRect(left, top, right, bottom, borderPaint);
+//
+//                // 选择文本颜色，使用高对比度颜色
+//                textPaint.setColor(Color.YELLOW);  // 使用黄色高对比度文字
+//
+//                // 计算文本位置：将文本放在边界框的正中央
+//                String label = String.valueOf(count);
+//                float textWidth = textPaint.measureText(label);  // 计算文字宽度
+//                float textX = (left + right) / 2 - textWidth / 2;  // 水平居中
+//                float textY = (top + bottom) / 2 + (textPaint.getTextSize() / 2);  // 垂直居中
+//
+//                // 绘制数字
+//                canvas.drawText(label, textX, textY, textPaint);
+//            } catch (Exception e) {
+//                System.out.println("ERROR: Exception occurred while labeling the image\n" + e.getMessage());
+//            }
+//            count++;
+//        }
+//
+//        try {
+//            File file = new File(output_path);
+//            FileOutputStream out = new FileOutputStream(file);
+//            mutableBitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+//            out.flush();
+//            out.close();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//    }
     public void drawBoundingBoxes(String img_path,
-                                           String output_path,
-                                           List<androidElement> elemList,
-                                           boolean recordMode,
-                                           boolean darkMode) {
+                                  String output_path,
+                                  List<androidElement> elemList,
+                                  boolean recordMode,
+                                  boolean darkMode) {
         Bitmap originalBitmap = BitmapFactory.decodeFile(img_path);
         Bitmap mutableBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true);
         Canvas canvas = new Canvas(mutableBitmap);
         Paint textPaint = new Paint();
-        textPaint.setTextSize(40);
+        textPaint.setTextSize(60);
+        textPaint.setFakeBoldText(true);
         textPaint.setAntiAlias(true);
+        textPaint.setTypeface(Typeface.DEFAULT_BOLD);
         Paint backgroundPaint = new Paint();
         backgroundPaint.setStyle(Paint.Style.FILL);
         int count = 1;
@@ -220,6 +310,7 @@ public class androidController {
                 int top = elem.bbox[1];
                 int right = elem.bbox[2];
                 int bottom = elem.bbox[3];
+
                 // 选择边界框颜色
                 if (recordMode) {
                     if ("clickable".equals(elem.attrib)) {
@@ -241,9 +332,9 @@ public class androidController {
                 Rect textBounds = new Rect();
                 textPaint.getTextBounds(label, 0, label.length(), textBounds);
 
-                int textX = (left + right) / 2 + 10;
-                int textY = (top + bottom) / 2 + 10;
-                int padding = 10;
+                int textX = (left + right) / 2 ;
+                int textY = (top + bottom) / 2 ;
+                int padding = 15;
 
                 // 绘制文本背景
                 canvas.drawRect(textX - padding,
@@ -377,9 +468,184 @@ public class androidController {
         Log.d(TAG, "End to swipe " + x + " " + y + " " + direction + " " + dist + " " + quick);
     }
 
+    public void swipePrecise(int startX, int startY, int endX, int endY, long duration) {
+        Log.d(TAG, "Begin precise swipe from (" + startX + ", " + startY + ") to (" + endX + ", " + endY + ") with duration " + duration);
+
+        Path path = new Path();
+        path.moveTo(startX, startY);
+        path.lineTo(endX, endY);
+
+        GestureDescription.StrokeDescription stroke = new GestureDescription.StrokeDescription(path, 0, duration);
+        GestureDescription gesture = new GestureDescription.Builder().addStroke(stroke).build();
+
+        if (myAccessibilityService.getInstance() != null) {
+            myAccessibilityService.getInstance().dispatchGesture(gesture, null, null);
+        }
+
+        Log.d(TAG, "End precise swipe from (" + startX + ", " + startY + ") to (" + endX + ", " + endY + ")");
+    }
+
+
+
+
+
+
     public void back(){
         myAccessibilityService.getInstance().simulateBackKey();
     }
+
+    public Point drawGrid(String imgPath, String outputPath) {
+        // 读取图片
+        Bitmap bitmap = BitmapFactory.decodeFile(imgPath);
+        if (bitmap == null) {
+            Log.e("GridDrawer", "无法读取图像: " + imgPath);
+            return new Point(-1, -1);
+        }
+
+        int height = bitmap.getHeight();
+        int width = bitmap.getWidth();
+        int unitHeight = getUnitLen(height);
+        int unitWidth = getUnitLen(width);
+        if (unitHeight < 0) unitHeight = 120;
+        if (unitWidth < 0) unitWidth = 120;
+
+        Bitmap mutableBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);
+        Canvas canvas = new Canvas(mutableBitmap);
+        Paint paint = new Paint();
+        paint.setColor(Color.rgb(255, 116, 113)); // 颜色 (R, G, B)
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1, unitWidth / 50));
+
+        Paint textPaint = new Paint();
+        textPaint.setColor(Color.BLACK);
+        textPaint.setTextSize(unitWidth / 10f);
+        textPaint.setAntiAlias(true);
+
+        int rows = height / unitHeight;
+        int cols = width / unitWidth;
+
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                int label = i * cols + j + 1;
+                int left = j * unitWidth;
+                int top = i * unitHeight;
+                int right = (j + 1) * unitWidth;
+                int bottom = (i + 1) * unitHeight;
+
+                // 画矩形
+                canvas.drawRect(left, top, right, bottom, paint);
+
+                // 画编号（黑色阴影）
+                canvas.drawText(String.valueOf(label), left + unitWidth * 0.05f + 3, top + unitHeight * 0.3f + 3, textPaint);
+                // 画编号（原色）
+                textPaint.setColor(Color.rgb(255, 116, 113));
+                canvas.drawText(String.valueOf(label), left + unitWidth * 0.05f, top + unitHeight * 0.3f, textPaint);
+                textPaint.setColor(Color.BLACK); // 复原颜色
+            }
+        }
+
+        File file = new File(outputPath);
+        try (FileOutputStream out = new FileOutputStream(file)) {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+            out.flush();
+            Log.d("GridDrawer", "图片保存成功: " + outputPath);
+        } catch (IOException e) {
+            Log.e("GridDrawer", "图片保存失败: " + e.getMessage());
+        }
+
+        return new Point(rows, cols); // 返回 rows 和 cols
+    }
+
+
+    private int getUnitLen(int n) {
+        for (int i = 1; i <= n; i++) {
+            if (n % i == 0 && i >= 120 && i <= 180) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+
+    public ArrayList<Map.Entry<String, Boolean>> parseSteps(String taskDescription) {
+        // 创建一个列表来存储步骤
+        ArrayList<Map.Entry<String, Boolean>> steps = new ArrayList<>();
+
+        // 正则表达式来匹配 "Step X: <action>"
+        String regex = "(Step \\d+: .+)";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(taskDescription);
+
+        // 查找并提取步骤
+        while (matcher.find()) {
+            // 提取步骤描述并去除多余空格，然后添加到列表中，Boolean 默认为 false
+            steps.add(new AbstractMap.SimpleEntry<>(matcher.group(1).trim(), false));
+        }
+
+        return steps;
+    }
+
+
+    public static String task_and_status(Map.Entry<String, Boolean> task_status){
+        if(task_status.getValue()){
+            return task_status.getKey()+"(Completed)";
+        }else{
+            return task_status.getKey()+"(Not Completed)";
+        }
+    }
+
+    public static String tasks_and_status(ArrayList<Map.Entry<String, Boolean>> tasks){
+        StringBuilder sb=new StringBuilder();
+        for(Map.Entry<String, Boolean> task:tasks){
+            sb.append(task_and_status(task));
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+
+    public static String completed_tasks_and_status(ArrayList<Map.Entry<String, Boolean>> tasks,int current_task_number){
+        if(current_task_number==1){
+            return "None";
+        }else{
+            StringBuilder sb=new StringBuilder();
+            for(int i=1;i<=current_task_number-1;i++){
+                sb.append(task_and_status(tasks.get(i-1)));
+                sb.append("\n");
+            }
+            return sb.toString();
+        }
+    }
+
+    public static void appendToFile(File filePath, String prompt) {
+        BufferedWriter writer = null;
+        try {
+            // 如果文件不存在，创建文件
+            if (!filePath.exists()) {
+                filePath.createNewFile();
+            }
+
+            // 创建FileWriter对象，传入true表示追加模式
+            writer = new BufferedWriter(new FileWriter(filePath, true));
+            // 将prompt内容写入文件
+            writer.write(prompt);
+            // 换行
+            writer.newLine();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            // 关闭writer
+            try {
+                if (writer != null) {
+                    writer.close();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+
+
 
 
 
